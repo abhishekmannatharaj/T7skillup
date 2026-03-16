@@ -35,10 +35,20 @@ export const saveAnalysis = async (userId, analysisData) => {
       userId,
       career_role: analysisData.career_role,
       readiness_score: analysisData.readiness_score,
+      score_breakdown: analysisData.score_breakdown || {},
+      honest_assessment: analysisData.honest_assessment || '',
       matched_skills: analysisData.matched_skills,
       missing_skills: analysisData.missing_skills,
       recommended_skills: analysisData.recommended_skills,
+      skill_priority_order: analysisData.skill_priority_order || [],
       learning_roadmap: analysisData.learning_roadmap,
+      quick_wins: analysisData.quick_wins || [],
+      resume_tips: analysisData.resume_tips || [],
+      linkedin_tips: analysisData.linkedin_tips || [],
+      motivation: analysisData.motivation || '',
+      final_outcome: analysisData.final_outcome || '',
+      ats_analysis: analysisData.ats_analysis || null,
+      resume_meta: analysisData.resume_meta || null,
       createdAt: serverTimestamp()
     });
     return docRef.id;

@@ -35,6 +35,7 @@ const StudentDashboard = () => {
   const [year, setYear] = useState(userProfile?.year || '');
   const [selectedSkills, setSelectedSkills] = useState(userProfile?.skills || []);
   const [careerInterest, setCareerInterest] = useState(userProfile?.career_interest || '');
+  const [resumeFile, setResumeFile] = useState(null);
   
   // UI state
   const [skillSearch, setSkillSearch] = useState('');
@@ -87,7 +88,8 @@ const StudentDashboard = () => {
       const analysisResult = await analyzeT7skillup(
         selectedSkills,
         selectedRole,
-        industryRoles
+        industryRoles,
+        resumeFile
       );
 
       await saveAnalysis(currentUser.uid, {
@@ -102,6 +104,36 @@ const StudentDashboard = () => {
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const handleResumeChange = (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      setResumeFile(null);
+      return;
+    }
+
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      setError('Please upload your resume as a PDF or Word document.');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Resume file must be under 10MB.');
+      e.target.value = '';
+      return;
+    }
+
+    setError('');
+    setResumeFile(file);
   };
 
   const viewPreviousResults = () => {
@@ -291,6 +323,37 @@ const StudentDashboard = () => {
                 ))}
               </div>
             </div>
+
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-zinc-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-zinc-900 rounded-xl flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-zinc-900 text-lg">ATS Resume Check</h2>
+                  <p className="text-sm text-zinc-500">Optional, but recommended</p>
+                </div>
+              </div>
+
+              <label className="block">
+                <span className="block text-sm font-semibold text-zinc-700 mb-2">Upload Resume</span>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={handleResumeChange}
+                  className="block w-full text-sm text-zinc-600 file:mr-4 file:rounded-xl file:border-0 file:bg-zinc-900 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-white hover:file:bg-zinc-800"
+                />
+              </label>
+
+              <div className="mt-4 rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-4">
+                <p className="text-sm font-medium text-zinc-800">
+                  {resumeFile ? resumeFile.name : 'No resume uploaded yet'}
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  We will score ATS fit, keyword match, formatting, and rewrite suggestions directly inside your results.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Right Column - Skills */}
@@ -380,12 +443,12 @@ const StudentDashboard = () => {
                   {analyzing ? (
                     <>
                       <Loader2 className="w-6 h-6 animate-spin" />
-                      Analyzing with AI...
+                      Analyzing skills{resumeFile ? ' + resume' : ''}...
                     </>
                   ) : (
                     <>
                       <Rocket className="w-6 h-6" />
-                      Analyze my skills
+                      Analyze my profile
                       <ArrowRight className="w-5 h-5" />
                     </>
                   )}

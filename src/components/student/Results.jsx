@@ -51,6 +51,8 @@ const Results = () => {
   const linkedin_tips = analysis.linkedin_tips || [];
   const motivation = analysis.motivation || '';
   const final_outcome = analysis.final_outcome || analysis.final_goal || '';
+  const ats_analysis = analysis.ats_analysis || null;
+  const resume_meta = analysis.resume_meta || null;
 
   const portfolioCourses = [
     ...matched_skills.slice(0, 5).map((skill) => ({
@@ -81,6 +83,28 @@ const Results = () => {
     if (score >= 70) return 'text-emerald-500';
     if (score >= 50) return 'text-amber-500';
     return 'text-red-500';
+  };
+
+  const getAtsTone = (score) => {
+    if (score >= 75) {
+      return {
+        text: 'text-emerald-600',
+        bg: 'bg-emerald-50',
+        border: 'border-emerald-100'
+      };
+    }
+    if (score >= 55) {
+      return {
+        text: 'text-amber-600',
+        bg: 'bg-amber-50',
+        border: 'border-amber-100'
+      };
+    }
+    return {
+      text: 'text-red-600',
+      bg: 'bg-red-50',
+      border: 'border-red-100'
+    };
   };
 
   const downloadPortfolio = () => {
@@ -505,6 +529,7 @@ const Results = () => {
               { id: 'home', icon: Home, label: 'Home' },
               { id: 'roadmap', icon: Rocket, label: 'Roadmap' },
               { id: 'skills', icon: Target, label: 'Skills' },
+              { id: 'ats', icon: FileText, label: 'ATS Resume' },
               { id: 'tips', icon: Briefcase, label: 'Career Tips' },
               { id: 'portfolio', icon: Code, label: 'Portfolio' }
             ].map(tab => (
@@ -706,6 +731,38 @@ const Results = () => {
                 </div>
               </div>
             </div>
+
+            {ats_analysis && (
+              <div className={`mt-4 rounded-2xl border p-4 ${getAtsTone(ats_analysis.score).bg} ${getAtsTone(ats_analysis.score).border}`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h4 className="font-semibold text-zinc-900 flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      ATS Resume Snapshot
+                    </h4>
+                    <p className="text-sm text-zinc-600 mt-1">
+                      {resume_meta?.file_name || 'Uploaded resume'} checked against {role?.role_name || analysis.career_role}
+                    </p>
+                  </div>
+                  <div className={`text-3xl font-black ${getAtsTone(ats_analysis.score).text}`}>
+                    {ats_analysis.score}%
+                  </div>
+                </div>
+                <p className="text-sm text-zinc-700 mt-3">{ats_analysis.summary}</p>
+                {ats_analysis.keyword_gaps?.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 mb-2">Top keyword gaps</p>
+                    <div className="flex flex-wrap gap-2">
+                      {ats_analysis.keyword_gaps.slice(0, 4).map((gap, index) => (
+                        <span key={index} className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-zinc-700 border border-zinc-200">
+                          {gap}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Course Manager Section */}
@@ -1406,6 +1463,116 @@ const Results = () => {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'ats' && (
+          <div className="space-y-6">
+            {!ats_analysis ? (
+              <div className="bg-white rounded-2xl p-8 shadow-lg border border-zinc-100 text-center">
+                <FileText className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+                <h2 className="text-xl font-bold text-zinc-900">No resume analysis yet</h2>
+                <p className="text-zinc-500 mt-2">
+                  Upload a resume from the dashboard to get an ATS score, keyword gaps, and rewrite suggestions here.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="bg-white rounded-2xl p-6 shadow-lg border border-zinc-100">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                    <div>
+                      <p className="text-sm font-semibold uppercase tracking-wide text-zinc-500">ATS Resume Review</p>
+                      <h2 className="text-3xl font-black text-zinc-900 mt-1">
+                        {resume_meta?.file_name || 'Uploaded Resume'}
+                      </h2>
+                      <p className="text-zinc-600 mt-2">{ats_analysis.summary}</p>
+                    </div>
+                    <div className={`rounded-3xl px-8 py-6 text-center ${getAtsTone(ats_analysis.score).bg} ${getAtsTone(ats_analysis.score).border} border`}>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">ATS Score</p>
+                      <p className={`text-5xl font-black ${getAtsTone(ats_analysis.score).text}`}>{ats_analysis.score}%</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {Object.entries(ats_analysis.section_scores || {}).map(([key, value]) => (
+                    <div key={key} className="bg-white rounded-2xl p-5 shadow-lg border border-zinc-100">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                        {key.replace('_', ' ')}
+                      </p>
+                      <p className={`text-3xl font-black mt-2 ${getScoreColor(value)}`}>{value}%</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid lg:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-2xl p-6 shadow-lg border border-zinc-100">
+                    <h3 className="font-bold text-zinc-900 text-xl mb-4 flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      What is working
+                    </h3>
+                    <ul className="space-y-3">
+                      {(ats_analysis.strengths || []).map((item, index) => (
+                        <li key={index} className="flex items-start gap-3 text-zinc-700">
+                          <span className="text-emerald-500">•</span>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-6 shadow-lg border border-zinc-100">
+                    <h3 className="font-bold text-zinc-900 text-xl mb-4 flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-amber-500" />
+                      Fix next
+                    </h3>
+                    <ul className="space-y-3">
+                      {(ats_analysis.issues || []).map((item, index) => (
+                        <li key={index} className="flex items-start gap-3 text-zinc-700">
+                          <span className="text-amber-500">•</span>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="grid lg:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-2xl p-6 shadow-lg border border-zinc-100">
+                    <h3 className="font-bold text-zinc-900 text-xl mb-4">Missing Keywords</h3>
+                    <div className="flex flex-wrap gap-3">
+                      {(ats_analysis.keyword_gaps || []).map((keyword, index) => (
+                        <span key={index} className="px-4 py-2 bg-red-50 text-red-700 rounded-xl text-sm font-semibold border border-red-100">
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-6 shadow-lg border border-zinc-100">
+                    <h3 className="font-bold text-zinc-900 text-xl mb-4">Suggested Keywords</h3>
+                    <div className="flex flex-wrap gap-3">
+                      {(ats_analysis.suggested_keywords || []).map((keyword, index) => (
+                        <span key={index} className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-sm font-semibold border border-emerald-100">
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-6 shadow-lg border border-zinc-100">
+                  <h3 className="font-bold text-zinc-900 text-xl mb-4">Rewrite Suggestions</h3>
+                  <div className="space-y-3">
+                    {(ats_analysis.rewrite_suggestions || []).map((suggestion, index) => (
+                      <div key={index} className="rounded-xl border border-zinc-100 bg-zinc-50 p-4 text-zinc-700">
+                        {suggestion}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
