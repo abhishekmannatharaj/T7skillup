@@ -6,11 +6,12 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+// import LearningActivityGraph from './LearningActivityGraph';
 import { 
   LogOut, ArrowLeft, Check, Calendar, ChevronDown, Download, Target, Sparkles,
   Trophy, Rocket, BookOpen, Zap, Clock, Code, ExternalLink, CheckCircle,
   GraduationCap, Briefcase, Play, AlertTriangle, Linkedin, FileText,
-  Youtube, Globe, TrendingUp, Award
+  Youtube, Globe, TrendingUp, Award, X, Home
 } from 'lucide-react';
 
 const Results = () => {
@@ -18,8 +19,9 @@ const Results = () => {
   const navigate = useNavigate();
   const { userProfile, logout } = useAuth();
   const [expandedMonth, setExpandedMonth] = useState(0);
-  const [activeTab, setActiveTab] = useState('roadmap');
-  
+  const [activeTab, setActiveTab] = useState('home');
+  const [selectedRoadmap, setSelectedRoadmap] = useState(null);
+
   const { analysis, role } = location.state || {};
 
   if (!analysis) {
@@ -50,10 +52,91 @@ const Results = () => {
   const motivation = analysis.motivation || '';
   const final_outcome = analysis.final_outcome || analysis.final_goal || '';
 
+  const portfolioCourses = [
+    ...matched_skills.slice(0, 5).map((skill) => ({
+      name: skill,
+      progress: 100,
+      status: 'Completed',
+      hours: Math.floor(Math.random() * 8) + 8,
+    })),
+    ...missing_skills.slice(0, 5).map((skill, index) => ({
+      name: skill,
+      progress: [30, 45, 60, 75, 40][index % 5],
+      status: 'In Progress',
+      hours: Math.floor(Math.random() * 8) + 2,
+    })),
+  ];
+
+  const totalPortfolioCourses = portfolioCourses.length;
+  const completedPortfolioCourses = portfolioCourses.filter((c) => c.status === 'Completed').length;
+  const inProgressPortfolioCourses = portfolioCourses.filter((c) => c.status === 'In Progress').length;
+  const avgPortfolioProgress = totalPortfolioCourses > 0
+    ? Math.round(portfolioCourses.reduce((sum, c) => sum + c.progress, 0) / totalPortfolioCourses)
+    : 0;
+
+  const strengthCourses = matched_skills.slice(0, 4);
+  const learningCourses = missing_skills.slice(0, 4);
+
   const getScoreColor = (score) => {
     if (score >= 70) return 'text-emerald-500';
     if (score >= 50) return 'text-amber-500';
     return 'text-red-500';
+  };
+
+  const downloadPortfolio = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+    const style = `
+      body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f8fafc;color:#1f2937;margin:0;padding:24px;}
+      .print-container{max-width:1000px;margin:0 auto;}
+      .print-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+      .print-header h1{font-size:1.9rem;margin:0;}
+      .card{background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;margin-bottom:18px;box-shadow:0 2px 10px rgba(15,23,42,0.05);}
+      .stat-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;}
+      .stat-item{background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:10px;text-align:center;}
+      .stat-item h3{margin:0;font-size:1.3rem;color:#1f2937;}
+      .stat-item p{margin:0;font-size:0.8rem;color:#64748b;}
+      .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px;}
+      .course-card{border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#fff;}
+      .course-card h4{margin:0 0 6px;color:#0f172a;}
+      .course-card p{margin:0;font-size:0.82rem;color:#475569;}
+      .progress-bar{height:8px;background:#e2e8f0;border-radius:999px;margin-top:8px;overflow:hidden;}
+      .progress-fill{height:100%;background:linear-gradient(90deg,#0ea5e9,#6366f1);}
+    `;
+
+    const summaryCards = `
+      <div class="stat-bar">
+        <div class="stat-item"><h3>${completedPortfolioCourses}</h3><p>Completed</p></div>
+        <div class="stat-item"><h3>${inProgressPortfolioCourses}</h3><p>In Progress</p></div>
+        <div class="stat-item"><h3>${avgPortfolioProgress}%</h3><p>Avg Progress</p></div>
+      </div>
+      <div class="stat-bar">
+        <div class="stat-item"><h3>${strengthCourses[0] || '—'}</h3><p>Top Skill</p></div>
+        <div class="stat-item"><h3>${learningCourses[0] || '—'}</h3><p>Top In-progress</p></div>
+        <div class="stat-item"><h3>${Math.min(100, avgPortfolioProgress + 15)}%</h3><p>Weekly Goal</p></div>
+      </div>
+    `;
+
+    const courseCards = portfolioCourses.map((course) => `
+      <div class="course-card">
+        <h4>${course.name}</h4>
+        <p>Status: ${course.status}</p>
+        <p>${course.hours}h logged</p>
+        <div class="progress-bar"><div class="progress-fill" style="width:${course.progress}%"></div></div>
+        <p style="margin-top:6px;font-size:0.75rem;color:#94a3b8;">${course.progress}% complete</p>
+      </div>
+    `).join('');
+
+    const printHtml = `<!doctype html><html><head><title>Portfolio Report</title><style>${style}</style></head><body><div class="print-container"><div class="print-header"><h1>Portfolio Dashboard</h1><button onclick="window.print()" style="padding:8px 12px;background:#2563eb;color:white;border:none;border-radius:8px;cursor:pointer;">Print</button></div><div class="card"><h2>Learning Portfolio</h2><p>A career-ready view of your course progress and expertise.</p>${summaryCards}<div class="row">${courseCards}</div></div></div></body></html>`;
+
+    printWindow.document.write(printHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 200);
+    setTimeout(() => printWindow.close(), 400);
   };
 
   // Helper to generate roadmap.sh links for skills
@@ -326,15 +409,20 @@ const Results = () => {
                 <Trophy className="w-6 h-6 text-white" />
               </div>
               <div>
-                <span className="font-bold text-zinc-900 text-xl">Your Placement Roadmap</span>
+                <span className="font-bold text-zinc-900 text-xl">Your Career Development Roadmap</span>
                 <p className="text-sm text-zinc-500">{role?.role_name || analysis.career_role}</p>
               </div>
             </div>
           </div>
           
-          <button onClick={logout} className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
-            <LogOut className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/dashboard')} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg shadow-sm transition">
+              Update Skills
+            </button>
+            <button onClick={logout} className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+              <LogOut className="w-6 h-6" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -411,26 +499,467 @@ const Results = () => {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex gap-3 mb-8 overflow-x-auto pb-2">
-          {[
-            { id: 'roadmap', icon: Rocket, label: 'Roadmap' },
-            { id: 'skills', icon: Target, label: 'Skills' },
-            { id: 'tips', icon: Briefcase, label: 'Career Tips' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-6 py-3.5 rounded-xl font-semibold text-base transition-all whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'bg-zinc-900 text-white shadow-lg'
-                  : 'bg-white text-zinc-600 hover:bg-zinc-100 border border-zinc-200'
-              }`}
-            >
-              <tab.icon className="w-5 h-5" />
-              {tab.label}
-            </button>
-          ))}
+        <div className="bg-white rounded-2xl p-2 mb-6 shadow-lg border border-zinc-100">
+          <div className="flex gap-2 overflow-x-auto">
+            {[
+              { id: 'home', icon: Home, label: 'Home' },
+              { id: 'roadmap', icon: Rocket, label: 'Roadmap' },
+              { id: 'skills', icon: Target, label: 'Skills' },
+              { id: 'tips', icon: Briefcase, label: 'Career Tips' },
+              { id: 'portfolio', icon: Code, label: 'Portfolio' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-base transition-all whitespace-nowrap flex-1 justify-center ${
+                  activeTab === tab.id
+                    ? 'bg-zinc-900 text-white shadow-md'
+                    : 'bg-transparent text-zinc-600 hover:bg-zinc-50'
+                }`}
+              >
+                <tab.icon className="w-5 h-5" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Learning Activity + Course Manager Grid - Below Navigation */}
+        {activeTab === 'home' && (
+          <div className="grid lg:grid-cols-3 gap-5 mb-6">
+            {/* Learning Activity Graph - Compact Version */}
+            <div className="lg:col-span-2 bg-white rounded-2xl p-4 shadow-lg border border-zinc-100">
+              {/* Header with Stats */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-bold text-zinc-900 text-lg flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-emerald-600" />
+                  Learning Activity
+                </h2>
+                <p className="text-xs text-zinc-500 mt-1">
+                  Track your daily progress
+                </p>
+              </div>
+              
+              {/* Compact Stats */}
+              <div className="flex gap-3">
+                <div className="text-center">
+                  <p className="text-xl font-bold text-emerald-600">
+                    {(() => {
+                      let total = 0;
+                      for (let i = 0; i < 365; i++) {
+                        total += Math.random() > 0.7 ? Math.floor(Math.random() * 5) : 0;
+                      }
+                      return total;
+                    })()}
+                  </p>
+                  <p className="text-[10px] text-zinc-500">Hours</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold text-blue-600">
+                    {(() => {
+                      let days = 0;
+                      for (let i = 0; i < 365; i++) {
+                        if (Math.random() > 0.7) days++;
+                      }
+                      return days;
+                    })()}
+                  </p>
+                  <p className="text-[10px] text-zinc-500">Days</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold text-amber-600">
+                    {Math.floor(Math.random() * 15)}
+                  </p>
+                  <p className="text-[10px] text-zinc-500">Streak</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center justify-end gap-2 mb-3 text-[10px] text-zinc-500">
+              <span>Less</span>
+              <div className="flex gap-1">
+                <div className="w-2.5 h-2.5 rounded-sm bg-zinc-100 border border-zinc-200"></div>
+                <div className="w-2.5 h-2.5 rounded-sm bg-emerald-200 border border-emerald-300"></div>
+                <div className="w-2.5 h-2.5 rounded-sm bg-emerald-400 border border-emerald-500"></div>
+                <div className="w-2.5 h-2.5 rounded-sm bg-emerald-600 border border-emerald-700"></div>
+                <div className="w-2.5 h-2.5 rounded-sm bg-emerald-800 border border-emerald-900"></div>
+              </div>
+              <span>More</span>
+            </div>
+            
+            {/* Activity Grid - Compact */}
+            <div className="overflow-x-auto pb-2">
+              <div className="inline-flex gap-0.5 min-w-full">
+                {(() => {
+                  const weeks = [];
+                  const today = new Date();
+                  const startDate = new Date(today);
+                  startDate.setDate(today.getDate() - 364);
+                  
+                  let dayCounter = 0;
+                  
+                  for (let week = 0; week < 53; week++) {
+                    const weekDays = [];
+                    
+                    for (let day = 0; day < 7; day++) {
+                      if (dayCounter >= 365) break;
+                      
+                      const currentDate = new Date(startDate);
+                      currentDate.setDate(startDate.getDate() + dayCounter);
+                      
+                      if (week === 0 && day < startDate.getDay()) {
+                        weekDays.push(null);
+                        continue;
+                      }
+                      
+                      const hours = Math.random() > 0.7 ? Math.floor(Math.random() * 5) : 0;
+                      const level = hours === 0 ? 0 : hours <= 1 ? 1 : hours <= 2 ? 2 : hours <= 3 ? 3 : 4;
+                      
+                      weekDays.push({
+                        date: currentDate.toISOString().split('T')[0],
+                        hours: hours,
+                        level: level,
+                        activity: hours > 0 ? ['Coding', 'Reading', 'Practice'][Math.floor(Math.random() * 3)] : null
+                      });
+                      
+                      dayCounter++;
+                    }
+                    
+                    weeks.push(weekDays);
+                    if (dayCounter >= 365) break;
+                  }
+                  
+                  return weeks.map((week, weekIndex) => (
+                    <div key={weekIndex} className="flex flex-col gap-0.5">
+                      {[0, 1, 2, 3, 4, 5, 6].map((dayIndex) => {
+                        const day = week[dayIndex];
+                        
+                        if (!day) {
+                          return <div key={dayIndex} className="w-2.5 h-2.5"></div>;
+                        }
+                        
+                        const levelColors = {
+                          0: 'bg-zinc-100 border border-zinc-200',
+                          1: 'bg-emerald-200 border border-emerald-300',
+                          2: 'bg-emerald-400 border border-emerald-500',
+                          3: 'bg-emerald-600 border border-emerald-700',
+                          4: 'bg-emerald-800 border border-emerald-900'
+                        };
+                        
+                        const dateObj = new Date(day.date);
+                        const formattedDate = dateObj.toLocaleDateString('en-US', { 
+                          weekday: 'short',
+                          month: 'short', 
+                          day: 'numeric'
+                        });
+                        
+                        return (
+                          <div
+                            key={dayIndex}
+                            className={`w-2.5 h-2.5 rounded-sm ${levelColors[day.level]} transition-all hover:ring-1 hover:ring-emerald-500 cursor-pointer group relative`}
+                            title={`${day.hours} hours - ${formattedDate}`}
+                          >
+                            {/* Compact Tooltip */}
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-zinc-900 text-white text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-20">
+                              {day.hours}h · {formattedDate}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+
+            {/* Month Labels - Compact */}
+            <div className="flex justify-between mt-2 text-[10px] text-zinc-400 px-1">
+              <span>Jan</span>
+              <span>Mar</span>
+              <span>May</span>
+              <span>Jul</span>
+              <span>Sep</span>
+              <span>Nov</span>
+            </div>
+
+            {/* Compact Learning Snapshot */}
+            <div className="mt-4 border-t border-zinc-100 pt-4">
+              <h4 className="font-semibold text-zinc-800 mb-3">Learning Snapshot</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-zinc-50 rounded-xl p-3 border border-zinc-100">
+                  <p className="text-xs text-zinc-500 mb-1">Recommended focus</p>
+                  <p className="font-semibold text-zinc-900">{missing_skills[0] ? `Improve ${missing_skills[0]}` : 'Strengthen your fundamentals'}</p>
+                </div>
+                <div className="bg-zinc-50 rounded-xl p-3 border border-zinc-100">
+                  <p className="text-xs text-zinc-500 mb-1">Matched skills</p>
+                  <p className="font-semibold text-zinc-900">{matched_skills.length} skills</p>
+                </div>
+                <div className="bg-zinc-50 rounded-xl p-3 border border-zinc-100">
+                  <p className="text-xs text-zinc-500 mb-1">Missing skills</p>
+                  <p className="font-semibold text-zinc-900">{missing_skills.length} skills</p>
+                </div>
+                <div className="bg-zinc-50 rounded-xl p-3 border border-zinc-100">
+                  <p className="text-xs text-zinc-500 mb-1">Next milestone</p>
+                  <p className="font-semibold text-zinc-900">Complete {missing_skills.slice(0, 2).join(' + ') || 'your roadmap'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Course Manager Section */}
+          <div className="bg-white rounded-2xl p-4 shadow-lg border border-zinc-100">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-zinc-900 text-base flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-blue-600" />
+                Recommended Courses
+              </h2>
+            </div>
+
+            <div className="space-y-3">
+              {/* Generate course recommendations based on missing skills */}
+              {(() => {
+                // Course database with real links
+                const courseDatabase = {
+                  'react': {
+                    name: 'React - The Complete Guide',
+                    platform: 'Udemy',
+                    url: 'https://www.udemy.com/course/react-the-complete-guide-incl-redux/',
+                    icon: '⚛️',
+                    color: 'blue'
+                  },
+                  'javascript': {
+                    name: 'JavaScript: Complete Course',
+                    platform: 'freeCodeCamp',
+                    url: 'https://www.freecodecamp.org/learn/javascript-algorithms-and-data-structures/',
+                    icon: '📜',
+                    color: 'yellow'
+                  },
+                  'node.js': {
+                    name: 'Node.js Developer Course',
+                    platform: 'Udemy',
+                    url: 'https://www.udemy.com/course/the-complete-nodejs-developer-course-2/',
+                    icon: '🟢',
+                    color: 'green'
+                  },
+                  'nodejs': {
+                    name: 'Node.js Developer Course',
+                    platform: 'Udemy',
+                    url: 'https://www.udemy.com/course/the-complete-nodejs-developer-course-2/',
+                    icon: '🟢',
+                    color: 'green'
+                  },
+                  'python': {
+                    name: 'Python for Everybody',
+                    platform: 'Coursera',
+                    url: 'https://www.coursera.org/specializations/python',
+                    icon: '🐍',
+                    color: 'emerald'
+                  },
+                  'dsa': {
+                    name: 'Data Structures & Algorithms',
+                    platform: 'freeCodeCamp',
+                    url: 'https://www.freecodecamp.org/learn/javascript-algorithms-and-data-structures/',
+                    icon: '🧩',
+                    color: 'purple'
+                  },
+                  'data structures': {
+                    name: 'Data Structures & Algorithms',
+                    platform: 'freeCodeCamp',
+                    url: 'https://www.freecodecamp.org/learn/javascript-algorithms-and-data-structures/',
+                    icon: '🧩',
+                    color: 'purple'
+                  },
+                  'algorithms': {
+                    name: 'Algorithms Specialization',
+                    platform: 'Coursera',
+                    url: 'https://www.coursera.org/specializations/algorithms',
+                    icon: '🧮',
+                    color: 'purple'
+                  },
+                  'system design': {
+                    name: 'System Design Interview',
+                    platform: 'ByteByteGo',
+                    url: 'https://bytebytego.com/',
+                    icon: '🏗️',
+                    color: 'pink'
+                  },
+                  'typescript': {
+                    name: 'TypeScript Complete Course',
+                    platform: 'Scrimba',
+                    url: 'https://scrimba.com/learn/typescript',
+                    icon: '📘',
+                    color: 'blue'
+                  },
+                  'mongodb': {
+                    name: 'MongoDB University',
+                    platform: 'MongoDB',
+                    url: 'https://learn.mongodb.com/',
+                    icon: '🍃',
+                    color: 'green'
+                  },
+                  'sql': {
+                    name: 'SQL for Data Science',
+                    platform: 'Coursera',
+                    url: 'https://www.coursera.org/learn/sql-for-data-science',
+                    icon: '🗄️',
+                    color: 'blue'
+                  },
+                  'docker': {
+                    name: 'Docker Mastery',
+                    platform: 'Udemy',
+                    url: 'https://www.udemy.com/course/docker-mastery/',
+                    icon: '🐳',
+                    color: 'cyan'
+                  },
+                  'git': {
+                    name: 'Git & GitHub Crash Course',
+                    platform: 'freeCodeCamp',
+                    url: 'https://www.freecodecamp.org/news/git-and-github-crash-course/',
+                    icon: '📦',
+                    color: 'orange'
+                  },
+                  'aws': {
+                    name: 'AWS Certified Developer',
+                    platform: 'AWS Training',
+                    url: 'https://aws.amazon.com/training/',
+                    icon: '☁️',
+                    color: 'amber'
+                  },
+                  'express': {
+                    name: 'Express.js Fundamentals',
+                    platform: 'freeCodeCamp',
+                    url: 'https://www.freecodecamp.org/news/free-8-hour-node-express-course/',
+                    icon: '🚂',
+                    color: 'zinc'
+                  },
+                  'html': {
+                    name: 'Learn HTML',
+                    platform: 'YouTube',
+                    url: 'https://www.youtube.com/results?search_query=html+tutorial',
+                    icon: '📺',
+                    color: 'red'
+                  },
+                  'css': {
+                    name: 'Learn CSS',
+                    platform: 'YouTube',
+                    url: 'https://www.youtube.com/results?search_query=css+tutorial',
+                    icon: '📺',
+                    color: 'red'
+                  }
+                };
+
+                // Map missing skills to courses
+                const recommendedCourses = missing_skills
+                  .slice(0, 4) // Show top 4
+                  .map(skill => {
+                    const normalizedSkill = skill.toLowerCase().trim();
+                    const course = courseDatabase[normalizedSkill] || {
+                      name: `Learn ${skill}`,
+                      platform: 'YouTube',
+                      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(skill + ' tutorial')}`,
+                      icon: '📺',
+                      color: 'red'
+                    };
+                    return { ...course, skill };
+                  });
+
+                const colorClasses = {
+                  blue: 'bg-blue-50 border-blue-100 hover:bg-blue-100',
+                  yellow: 'bg-yellow-50 border-yellow-100 hover:bg-yellow-100',
+                  green: 'bg-green-50 border-green-100 hover:bg-green-100',
+                  emerald: 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100',
+                  purple: 'bg-purple-50 border-purple-100 hover:bg-purple-100',
+                  pink: 'bg-pink-50 border-pink-100 hover:bg-pink-100',
+                  cyan: 'bg-cyan-50 border-cyan-100 hover:bg-cyan-100',
+                  orange: 'bg-orange-50 border-orange-100 hover:bg-orange-100',
+                  amber: 'bg-amber-50 border-amber-100 hover:bg-amber-100',
+                  zinc: 'bg-zinc-50 border-zinc-100 hover:bg-zinc-100',
+                  red: 'bg-red-50 border-red-100 hover:bg-red-100'
+                };
+
+                return recommendedCourses.length > 0 ? (
+                  <div>
+                    <p className="text-xs font-semibold text-zinc-500 mb-2">FOR YOUR MISSING SKILLS</p>
+                    <div className="space-y-2">
+                      {recommendedCourses.map((course, idx) => (
+                        <a
+                          key={idx}
+                          href={course.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`block p-3 rounded-lg border transition-all cursor-pointer ${colorClasses[course.color]}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 flex items-start gap-2">
+                              <span className="text-xl">{course.icon}</span>
+                              <div className="flex-1">
+                                <p className="font-semibold text-sm text-zinc-900 mb-0.5">{course.name}</p>
+                                <p className="text-xs text-zinc-600">{course.platform}</p>
+                                <p className="text-xs text-zinc-500 mt-1">Learn: {course.skill}</p>
+                              </div>
+                            </div>
+                            <ExternalLink className="w-4 h-4 text-zinc-400 flex-shrink-0 ml-2" />
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Trophy className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+                    <p className="font-semibold text-zinc-900">All caught up!</p>
+                    <p className="text-sm text-zinc-500">You have all the required skills</p>
+                  </div>
+                );
+              })()}
+
+              {/* Additional Resources */}
+              {missing_skills.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-zinc-100">
+                  <p className="text-xs font-semibold text-zinc-500 mb-2">MORE PLATFORMS</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <a
+                      href="https://www.udemy.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-purple-50 hover:bg-purple-100 rounded-lg border border-purple-100 transition-colors text-center"
+                    >
+                      <p className="text-xs font-semibold text-purple-900">Udemy</p>
+                    </a>
+                    <a
+                      href="https://www.coursera.org/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-100 transition-colors text-center"
+                    >
+                      <p className="text-xs font-semibold text-blue-900">Coursera</p>
+                    </a>
+                    <a
+                      href="https://www.freecodecamp.org/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-green-50 hover:bg-green-100 rounded-lg border border-green-100 transition-colors text-center"
+                    >
+                      <p className="text-xs font-semibold text-green-900">freeCodeCamp</p>
+                    </a>
+                    <a
+                      href="https://scrimba.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-100 transition-colors text-center"
+                    >
+                      <p className="text-xs font-semibold text-orange-900">Scrimba</p>
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        )}
+
 
         {/* TAB: Roadmap */}
         {activeTab === 'roadmap' && (
@@ -462,57 +991,32 @@ const Results = () => {
               </div>
               <p className="text-base text-zinc-600 mb-5">📚 Interactive learning paths created by the community. Click to explore in-depth roadmaps:</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {[
-                  { name: 'Frontend', path: 'frontend', color: 'bg-blue-500' },
-                  { name: 'Backend', path: 'backend', color: 'bg-emerald-500' },
-                  { name: 'React', path: 'react', color: 'bg-cyan-500' },
-                  { name: 'JavaScript', path: 'javascript', color: 'bg-yellow-500' },
-                  { name: 'Python', path: 'python', color: 'bg-green-500' },
-                  { name: 'Node.js', path: 'nodejs', color: 'bg-lime-600' },
-                  { name: 'DSA', path: 'datastructures-and-algorithms', color: 'bg-purple-500' },
-                  { name: 'System Design', path: 'system-design', color: 'bg-pink-500' },
-                ].map((item) => (
-                  <a
-                    key={item.path}
-                    href={`https://roadmap.sh/${item.path}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-4 bg-zinc-50 hover:bg-zinc-100 rounded-xl border border-zinc-200 transition-all hover:shadow-md group"
-                  >
-                    <div className={`w-10 h-10 ${item.color} rounded-lg flex items-center justify-center`}>
-                      <BookOpen className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-zinc-800 text-base">{item.name}</p>
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600" />
-                  </a>
-                ))}
-              </div>
-
-              {/* Skills-specific roadmaps based on missing skills */}
-              {missing_skills.length > 0 && (
-                <div className="mt-5 pt-5 border-t border-zinc-100">
-                  <p className="text-base font-semibold text-zinc-700 mb-3">🎯 Roadmaps for your missing skills:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {missing_skills.map((skill, i) => {
-                      const roadmapUrl = getRoadmapLink(skill);
-                      return roadmapUrl ? (
-                        <a
-                          key={i}
-                          href={roadmapUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-4 py-2.5 bg-amber-100 text-amber-800 rounded-lg text-base font-medium hover:bg-amber-200 transition-colors flex items-center gap-2"
-                        >
-                          {skill}
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      ) : null;
-                    })}
+              {[
+                { name: 'Frontend', path: 'frontend', color: 'bg-blue-500', pdf: '/roadmaps/frontend.pdf' },
+                { name: 'Backend', path: 'backend', color: 'bg-emerald-500', pdf: '/roadmaps/backend.pdf' },
+                { name: 'React', path: 'react', color: 'bg-cyan-500', pdf: '/roadmaps/react.pdf' },
+                { name: 'JavaScript', path: 'javascript', color: 'bg-yellow-500', pdf: '/roadmaps/javascript.pdf' },
+                { name: 'Python', path: 'python', color: 'bg-green-500', pdf: '/roadmaps/python.pdf' },
+                { name: 'Node.js', path: 'nodejs', color: 'bg-lime-600', pdf: '/roadmaps/nodejs.pdf' },
+                { name: 'DSA', path: 'datastructures-and-algorithms', color: 'bg-purple-500', pdf: '/roadmaps/datastructures-and-algorithms.pdf' },
+                { name: 'System Design', path: 'system-design', color: 'bg-pink-500', pdf: '/roadmaps/system-design.pdf' },
+              ].map((item) => (
+                <button
+                  key={item.path}
+                  onClick={() => setSelectedRoadmap({ name: item.name, path: item.path, pdf: item.pdf })}
+                  className="flex items-center gap-3 p-4 bg-zinc-50 hover:bg-zinc-100 rounded-xl border border-zinc-200 transition-all hover:shadow-md group"
+                >
+                  <div className={`w-10 h-10 ${item.color} rounded-lg flex items-center justify-center`}>
+                    <BookOpen className="w-5 h-5 text-white" />
                   </div>
-                </div>
-              )}
+                  <div className="flex-1">
+                    <p className="font-semibold text-zinc-800 text-base">{item.name}</p>
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600" />
+                </button>
+              ))}
+                
+              </div>
             </div>
 
             {/* Learning Resources */}
@@ -834,35 +1338,45 @@ const Results = () => {
           <div className="space-y-6">
             {/* Priority Order */}
             {skill_priority_order.length > 0 && (
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-zinc-100">
-                <h2 className="font-bold text-zinc-900 text-xl mb-5 flex items-center gap-2">
-                  <TrendingUp className="w-6 h-6" /> Skills Priority Order
+              <div className="bg-gradient-to-r from-indigo-50 via-cyan-50 to-emerald-50 rounded-3xl p-6 shadow-2xl border border-indigo-100">
+                <h2 className="font-bold text-zinc-900 text-2xl mb-5 flex items-center gap-3">
+                  <TrendingUp className="w-6 h-6 text-indigo-500" /> Skills Priority Order
                 </h2>
-                <div className="space-y-4">
-                  {skill_priority_order.map((item, i) => {
-                    const isObject = typeof item === 'object';
-                    return (
-                      <div key={i} className="flex items-start gap-5 p-5 bg-zinc-50 rounded-xl border border-zinc-100">
-                        <div className="w-12 h-12 bg-zinc-900 text-white rounded-xl flex items-center justify-center font-bold text-lg flex-shrink-0">
-                          {i + 1}
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-bold text-zinc-900 text-lg">{isObject ? item.skill : item}</h4>
-                          {isObject && item.reason && <p className="text-base text-zinc-600 mb-3">{item.reason}</p>}
-                          {isObject && (
-                            <div className="flex gap-3">
-                              {item.time_to_learn && (
-                                <span className="text-sm bg-blue-100 text-blue-700 px-3 py-1.5 rounded">⏱️ {item.time_to_learn}</span>
-                              )}
-                              {item.difficulty && (
-                                <span className="text-sm bg-amber-100 text-amber-700 px-3 py-1.5 rounded">📊 {item.difficulty}</span>
-                              )}
+                <p className="text-sm text-zinc-500 mb-4">Level-up plan with stepwise focus. Follow the ranked list to maximize learning velocity.</p>
+                <div className="relative">
+                  <div className="absolute left-8 top-14 bottom-0 w-0.5 bg-gradient-to-b from-indigo-300 via-cyan-300 to-emerald-300"></div>
+                  <div className="space-y-4">
+                    {skill_priority_order.map((item, i) => {
+                      const isObject = typeof item === 'object';
+                      const gradientBadge = i % 3 === 0 ? 'from-indigo-500 to-blue-400' : i % 3 === 1 ? 'from-emerald-500 to-teal-400' : 'from-amber-500 to-orange-400';
+                      return (
+                        <div key={i} className="relative flex items-start gap-4 p-4 bg-white/90 backdrop-blur-sm border border-white shadow-sm rounded-2xl hover:shadow-lg transition-shadow">
+                          <div className="relative z-10">
+                            <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${gradientBadge} flex items-center justify-center text-white font-extrabold text-lg`}>
+                              {i + 1}
                             </div>
-                          )}
+                          </div>
+
+                          <div className="flex-1">
+                            <h4 className="font-bold text-zinc-900 text-lg leading-tight">{isObject ? item.skill : item}</h4>
+                            {isObject && item.reason && <p className="text-zinc-600 mt-1 text-sm">{item.reason}</p>}
+
+                            {isObject && (
+                              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                                {item.time_to_learn && (
+                                  <div className="px-2 py-1 rounded-lg bg-indigo-100 text-indigo-600 font-semibold">⏱️ {item.time_to_learn}</div>
+                                )}
+                                {item.difficulty && (
+                                  <div className="px-2 py-1 rounded-lg bg-amber-100 text-amber-700 font-semibold">📊 {item.difficulty}</div>
+                                )}
+                                <div className="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 font-semibold">✅ {matched_skills.includes(isObject ? item.skill : item) ? 'Acquired' : 'Pending'}</div>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
@@ -1141,23 +1655,183 @@ const Results = () => {
           </div>
         )}
 
+        {/* TAB: Portfolio Generator */}
+        {activeTab === 'portfolio' && (
+          <div id="portfolioPrintable" className="space-y-6">
+            <div className="rounded-2xl bg-white p-4 border border-zinc-200 shadow-sm flex flex-wrap items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-zinc-900">Portfolio Dashboard</h2>
+                <p className="text-sm text-zinc-500">A quick export of the current learning portfolio view.</p>
+              </div>
+              <button
+                onClick={downloadPortfolio}
+                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Download Portfolio
+              </button>
+            </div>
+            {/* Learning Portfolio Dashboard */}
+            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-6 shadow-lg border border-blue-100">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <h2 className="font-bold text-zinc-900 text-2xl">Learning Portfolio</h2>
+                  <p className="text-zinc-600 text-sm">A career-ready view of your course progress and expertise.</p>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm border border-blue-100">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-sm">✓</span>
+                    <div>
+                      <p className="text-xl font-semibold text-emerald-700">{completedPortfolioCourses}</p>
+                      <p className="text-xs text-zinc-500">Completed</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm border border-blue-100">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-700 text-sm">⌛</span>
+                    <div>
+                      <p className="text-xl font-semibold text-amber-600">{inProgressPortfolioCourses}</p>
+                      <p className="text-xs text-zinc-500">In Progress</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm border border-blue-100">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-purple-100 text-purple-700 text-sm">%</span>
+                    <div>
+                      <p className="text-xl font-semibold text-purple-700">{avgPortfolioProgress}%</p>
+                      <p className="text-xs text-zinc-500">Avg Progress</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+                <div className="p-3 bg-white rounded-xl border border-blue-100 text-center">
+                  <p className="text-xs text-zinc-500">Top Skill</p>
+                  <p className="text-sm font-semibold text-zinc-900">{strengthCourses[0] || 'No data yet'}</p>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-blue-100 text-center">
+                  <p className="text-xs text-zinc-500">Top In-progress</p>
+                  <p className="text-sm font-semibold text-zinc-900">{learningCourses[0] || 'None'}</p>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-blue-100 text-center">
+                  <p className="text-xs text-zinc-500">Weekly goal</p>
+                  <p className="text-sm font-semibold text-zinc-900">{Math.min(100, avgPortfolioProgress + 15)}%</p>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-blue-100 text-center">
+                  <p className="text-xs text-zinc-500">Next milestone</p>
+                  <p className="text-sm font-semibold text-zinc-900">Complete {learningCourses[0] || 'a course'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Course Completion Roadmap */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-zinc-100">
+              <h3 className="font-bold text-zinc-900 text-xl mb-3">Course Completion Roadmap</h3>
+              <p className="text-sm text-zinc-500 mb-4">Your prioritized course journey with progress tags and status indicators.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {portfolioCourses.map((course, idx) => (
+                  <div key={`${course.name}-${idx}`} className="p-4 rounded-xl border border-zinc-100 bg-zinc-50 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-zinc-900 text-lg">{course.name}</p>
+                        <p className="text-xs text-zinc-500">{course.status}</p>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded ${course.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {course.progress}%
+                      </span>
+                    </div>
+                    <div className="mt-3 h-2.5 bg-zinc-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-500" style={{ width: `${course.progress}%` }}></div>
+                    </div>
+                    <p className="mt-2 text-xs text-zinc-500">{course.hours} hrs tracked</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Course Progress Detail */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-zinc-100">
+              <h3 className="font-bold text-zinc-900 text-xl mb-4">Detailed Course Progress</h3>
+              <div className="space-y-3">
+                {portfolioCourses.length === 0 ? (
+                  <p className="text-zinc-500">No course progress found. Complete skill mapping first.</p>
+                ) : (
+                  portfolioCourses.map((course, idx) => (
+                    <div key={`${course.name}-${idx}`} className="p-3 rounded-lg border border-zinc-200">
+                      <div className="flex justify-between items-center mb-1">
+                        <p className="font-semibold text-zinc-800">{course.name}</p>
+                        <span className={`text-xs font-semibold ${course.status === 'Completed' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          {course.status}
+                        </span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-zinc-100 overflow-hidden mb-1">
+                        <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-700" style={{ width: `${course.progress}%` }}></div>
+                      </div>
+                      <p className="text-xs text-zinc-500">{course.progress}% complete • {course.hours}h logged</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Removed template galleries and generator UI to keep portfolio focused on personal course progress */}
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="px-8 py-4 bg-white text-zinc-700 font-bold text-lg rounded-xl border-2 border-zinc-200 hover:bg-zinc-50 transition-all flex items-center justify-center gap-2"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Update Skills
-          </button>
-          <button
-            onClick={() => window.print()}
-            className="px-8 py-4 bg-zinc-900 text-white font-bold text-lg rounded-xl shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
-          >
-            <Download className="w-5 h-5" />
-            Download Report
-          </button>
+          {/* This section intentionally kept minimal: primary navigation at the top and download in portfolio tab */}
         </div>
+
+        {/* Roadmap Inline Modal */}
+        {selectedRoadmap && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <BookOpen className="w-5 h-5 text-zinc-700" />
+                  <h3 className="font-bold text-zinc-900 text-lg">{selectedRoadmap.name} Roadmap</h3>
+                </div>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={`https://roadmap.sh/${selectedRoadmap.path}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                  >
+                    Visit roadmap.sh <ExternalLink className="w-4 h-4" />
+                  </a>
+                  <button
+                    onClick={() => setSelectedRoadmap(null)}
+                    className="p-2 rounded-xl hover:bg-zinc-100 text-zinc-500 hover:text-zinc-900 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* PDF Viewer */}
+              {selectedRoadmap.pdf ? (
+                <iframe
+                  src={selectedRoadmap.pdf}
+                  className="flex-1 w-full border-0"
+                  title={`${selectedRoadmap.name} Roadmap PDF`}
+                />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 gap-5">
+                  <p className="text-zinc-500 text-base">PDF not available for this roadmap.</p>
+                  <a
+                    href={`https://roadmap.sh/${selectedRoadmap.path}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white font-bold rounded-xl"
+                  >
+                    Open on roadmap.sh <ExternalLink className="w-4 h-4" />
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

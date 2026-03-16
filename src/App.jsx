@@ -30,11 +30,12 @@ import Landing from './components/common/Landing';
  */
 const DashboardRouter = () => {
   const { userProfile } = useAuth();
-  
+
   if (userProfile?.role === 'admin') {
     return <Navigate to="/admin" replace />;
   }
-  
+
+  // Default student dashboard route.
   return <StudentDashboard />;
 };
 
