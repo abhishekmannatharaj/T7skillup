@@ -57,21 +57,23 @@ export const saveAnalysis = async (userId, analysisData) => {
 export const getLatestAnalysis = async (userId) => {
   try {
     const analysisRef = collection(db, 'skill_analysis');
+    // Fetch all for user and sort in memory to avoid index requirement
     const q = query(
-      analysisRef,
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc'),
-      limit(1)
+      analysisRef, 
+      where('userId', '==', userId)
     );
     
     const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
     
-    if (snapshot.empty) {
-      return null;
-    }
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
-    const doc = snapshot.docs[0];
-    return { id: doc.id, ...doc.data() };
+    // Sort by createdAt descending
+    return data.sort((a, b) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+      return dateB - dateA;
+    })[0];
   } catch (error) {
     console.error('Error fetching latest analysis:', error);
     return null;
@@ -89,12 +91,18 @@ export const getUserAnalyses = async (userId) => {
     const analysisRef = collection(db, 'skill_analysis');
     const q = query(
       analysisRef,
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', userId)
     );
     
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Sort in memory
+    return data.sort((a, b) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+      return dateB - dateA;
+    });
   } catch (error) {
     console.error('Error fetching user analyses:', error);
     return [];
@@ -109,10 +117,15 @@ export const getUserAnalyses = async (userId) => {
 export const getAllAnalyses = async () => {
   try {
     const analysisRef = collection(db, 'skill_analysis');
-    const q = query(analysisRef, orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(analysisRef);
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Sort in memory
+    return data.sort((a, b) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+      return dateB - dateA;
+    });
   } catch (error) {
     console.error('Error fetching all analyses:', error);
     return [];
@@ -210,11 +223,44 @@ export const getAllStudents = async () => {
   }
 };
 
+/**
+ * Get the latest YouTube insights for a user
+ * 
+ * @param {string} userId - User ID
+ * @returns {Promise<object[]>} - Array of YouTube insights
+ */
+export const getYoutubeInsights = async (userId) => {
+  try {
+    const insightsRef = collection(db, 'youtube_insights');
+    // Fetch all for this user and sort in memory to avoid index requirement
+    const q = query(
+      insightsRef,
+      where('userId', '==', userId)
+    );
+    
+    const snapshot = await getDocs(q);
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Sort by syncedAt descending
+    return data
+      .sort((a, b) => {
+        const dateA = a.syncedAt?.toDate ? a.syncedAt.toDate() : new Date(a.syncedAt);
+        const dateB = b.syncedAt?.toDate ? b.syncedAt.toDate() : new Date(b.syncedAt);
+        return dateB - dateA;
+      })
+      .slice(0, 5);
+  } catch (error) {
+    console.error('Error fetching YouTube insights:', error);
+    return [];
+  }
+};
+
 export default {
   saveAnalysis,
   getLatestAnalysis,
   getUserAnalyses,
   getAllAnalyses,
   getCampusAnalytics,
-  getAllStudents
+  getAllStudents,
+  getYoutubeInsights
 };

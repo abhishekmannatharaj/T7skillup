@@ -4,6 +4,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { buildSystemPrompt, callGemini, detectIntent, getQuickReplies } from "./chatbot";
+import { getYoutubeInsights } from "../../services/firestoreService";
 import "./chatbot.css";
 
 const TypingIndicator = () => (
@@ -17,6 +18,7 @@ const TypingIndicator = () => (
 
 const ChatbotWidget = ({ geminiApiKey, userProfile }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [youtubeInsights, setYoutubeInsights] = useState([]);
   const [messages, setMessages] = useState([
     {
       role: "assistant",
@@ -41,8 +43,23 @@ What would you like to know about your progress or career path today?`,
   }, [messages, isLoading]);
 
   useEffect(() => {
-    if (isOpen) setTimeout(() => inputRef.current?.focus(), 300);
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 300);
+      loadYoutubeInsights();
+    }
   }, [isOpen]);
+
+  const loadYoutubeInsights = async () => {
+    if (userProfile?.uid || userProfile?.id) {
+       const userId = userProfile.uid || userProfile.id;
+       console.log("DEBUG: Fetching insights for userId:", userId);
+       const insights = await getYoutubeInsights(userId);
+       console.log("DEBUG: Insights found:", insights);
+       setYoutubeInsights(insights);
+    } else {
+       console.log("DEBUG: No valid userId found in userProfile", userProfile);
+    }
+  };
 
   // Update initial message when userProfile name becomes available
   useEffect(() => {
@@ -69,7 +86,7 @@ What would you like to know about your progress or career path today?`
     setQuickReplies([]);
 
     try {
-      const systemPrompt = buildSystemPrompt(userProfile);
+      const systemPrompt = buildSystemPrompt({ ...userProfile, youtubeInsights });
       const reply = await callGemini(geminiApiKey, updatedMessages, systemPrompt);
       const botMsg = { role: "assistant", content: reply, timestamp: new Date() };
       setMessages((prev) => [...prev, botMsg]);
@@ -116,6 +133,15 @@ What would you like to know about your progress or career path today?`
           <span>🎯 {userProfile?.career_interest || "Set Goal"}</span>
           <span>⚡ {userProfile?.skills?.length || 0} Skills</span>
         </div>
+
+        {youtubeInsights.length > 0 && (
+          <div className="sf-insights-banner">
+            <span className="sf-insights-icon">📹</span>
+            <div className="sf-insights-text">
+              <strong>Recently Synced:</strong> {youtubeInsights[0].title.substring(0, 30)}...
+            </div>
+          </div>
+        )}
 
         <div className="sf-messages">
           {messages.map((msg, idx) => (

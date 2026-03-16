@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ArrowRight,
   Check,
+  Copy,
   Briefcase,
   GraduationCap,
   Sparkles,
@@ -249,6 +250,25 @@ const StudentDashboard = () => {
                     ))}
                   </div>
                 </div>
+
+                <div className="pt-4 mt-2 border-t border-zinc-100">
+                   <div className="flex items-center justify-between">
+                     <div>
+                       <p className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Extension Sync ID</p>
+                       <code className="text-xs font-mono text-indigo-600">{currentUser?.uid}</code>
+                     </div>
+                     <button 
+                       onClick={() => {
+                         navigator.clipboard.writeText(currentUser?.uid);
+                         alert('Sync ID copied!');
+                       }}
+                       className="p-2 bg-zinc-50 hover:bg-zinc-100 rounded-lg text-zinc-400 hover:text-indigo-600 transition-all border border-zinc-200"
+                       title="Copy Sync ID"
+                     >
+                       <Copy className="w-4 h-4" />
+                     </button>
+                   </div>
+                </div>
               </div>
             </div>
 
@@ -397,6 +417,11 @@ const StudentDashboard = () => {
           </div>
         </div>
       </main>
+
+      <ChatbotWidget 
+        geminiApiKey={import.meta.env.VITE_GEMINI_API_KEY} 
+        userProfile={{...userProfile, uid: currentUser?.uid}} 
+      />
     </div>
   );
 };

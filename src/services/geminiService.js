@@ -206,12 +206,26 @@ export const analyzeT7skillup = async (studentSkills, selectedRole, allRoles) =>
         priority_skills: selectedRole.priority_skills
       }, null, 2));
 
-    // Get Gemini model
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // List of models to try in order
+    const targetModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    let response;
+    let modelNameUsed = '';
 
-    // Generate response
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
+    for (const modelName of targetModels) {
+      try {
+        console.log(`Analyzing with model: ${modelName}`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(prompt);
+        response = await result.response;
+        modelNameUsed = modelName;
+        // If we get a response, break the loop
+        if (response) break;
+      } catch (err) {
+        console.warn(`Model ${modelName} failed in geminiService:`, err.message);
+        if (modelName === targetModels[targetModels.length - 1]) throw err;
+      }
+    }
+
     const text = response.text();
 
     // Parse JSON from response (handle potential markdown code blocks)

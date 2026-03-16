@@ -1,7 +1,6 @@
-// ============================================================
-// Skill-Flow AI Chatbot - Core Logic
 // Powered by Google Gemini API
 // ============================================================
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
  * @typedef {Object} UserLearningData
@@ -18,6 +17,14 @@
 // ============================================================
 export function buildSystemPrompt(userData) {
   const skillsSummary = userData.skills?.join(", ") || "No skills selected yet";
+  
+  // YouTube Insights from Extension
+  let youtubeContext = "No recent YouTube learning data.";
+  if (userData.youtubeInsights && userData.youtubeInsights.length > 0) {
+    youtubeContext = userData.youtubeInsights.map(vid => 
+      `- Watched "${vid.title}" (${vid.channel}). Quality: ${vid.rating}/5, Relevance: ${vid.relevance}% - Summary: ${vid.summary}`
+    ).join("\n");
+  }
 
   return `You are T7 SKILL_BOT, a friendly AI career mentor integrated into the T7skillup placement readiness platform.
 
@@ -28,17 +35,21 @@ Academic Background: ${userData.year ? userData.year + " Year " : ""}${userData.
 Skills: ${skillsSummary}
 Current Readiness Score: ${userData.readiness_score || 0}%
 
+== RECENT YOUTUBE LEARNING (Synced from T7 Extension) ==
+${youtubeContext}
+
 == YOUR CAPABILITIES ==
 1. PLACEMENT READINESS: Analyze and explain the user's readiness for their target role.
 2. SKILL GAP: Compare user skills to ${userData.career_interest || "industry"} requirements and identify missing skills.
-3. RECOMMENDATIONS: Suggest high-quality learning resources (YouTube, Coursera, etc.) to bridge gaps.
-4. DOUBT SOLVING: Answer technical questions with simple explanations and examples.
+3. RECOMMENDATIONS: Suggest high-quality learning resources (YouTube, Coursera, etc.) to bridge gaps. Mention the YouTube videos the user has already watched if relevant.
+4. DOUBT SOLVING: Answer technical questions based on both platform knowledge and the specific YouTube videos the user has synced.
 5. CAREER ADVICE: Suggest intermediate jobs or roles the user qualifies for NOW based on their skills.
 
 == BEHAVIOR RULES ==
 - Always be encouraging, concise, and actionable.
 - Use emojis sparingly to keep tone friendly.
 - When recommending resources, be specific about why it helps.
+- If the user has recently synced YouTube videos, acknowledge them if they are relevant to the conversation.
 - If the user asks something unrelated to learning or career, gently redirect them.
 - Keep responses focused — don't dump everything at once. Ask follow-up questions.
 
@@ -46,87 +57,112 @@ Respond in clean, readable text. Use bullet points and short paragraphs. Never u
 }
 
 // ============================================================
-// GEMINI API CALL
+// GEMINI API CALL (Using direct Fetch to match working Extension)
 // ============================================================
 export async function callGemini(apiKey, messages, systemPrompt) {
-  // Ordered from newest/most preferred to older/more common
+  if (!apiKey || apiKey.trim() === "") {
+    console.error("DEBUG: API Key is missing!");
+    throw new Error("Gemini API Key is missing. Please check your .env file.");
+  }
+
+  const maskedKey = apiKey.substring(0, 6) + "..." + apiKey.substring(apiKey.length - 4);
+  console.log(`DEBUG: Chatbot calling Gemini via Fetch with key: ${maskedKey}`);
+
+  const recentMessages = messages.slice(-5);
+  const lastUserMessage = recentMessages[recentMessages.length - 1].content;
+  
+  const conversationContext = recentMessages.slice(0, -1).map(m => 
+    `${m.role === 'assistant' ? 'AI' : 'User'}: ${m.content}`
+  ).join("\n");
+
+  const prompt = conversationContext 
+    ? `Recent Conversation:\n${conversationContext}\n\nUser: ${lastUserMessage}`
+    : lastUserMessage;
+
+  // Models in priority order - Using VERIFIED IDs from the user's API key list
   const targetModels = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-flash-latest",
-    "gemini-pro-latest"
+    { name: "gemini-2.5-flash", version: "v1beta" },
+    { name: "gemini-2.0-flash", version: "v1beta" },
+    { name: "gemini-flash-latest", version: "v1beta" },
+    { name: "gemini-pro-latest", version: "v1beta" },
+    { name: "gemini-3.1-flash-lite-preview", version: "v1beta" },
+    { name: "gemini-2.5-flash-lite", version: "v1beta" },
+    { name: "gemini-2.5-pro", version: "v1beta" }
   ];
 
-  // Convert messages to Gemini format
-  const history = messages.slice(0, -1).map((msg) => ({
-    role: msg.role === "assistant" ? "model" : "user",
-    parts: [{ text: msg.content }],
-  }));
+  let lastError = null;
 
-  const lastMessage = messages[messages.length - 1];
-
-  const requestBody = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: `SYSTEM INSTRUCTION: ${systemPrompt}` }],
-      },
-      {
-        role: "model",
-        parts: [{ text: "Understood. I will act as T7 SKILL_BOT as instructed." }],
-      },
-      ...history,
-      {
-        role: "user",
-        parts: [{ text: lastMessage.content }],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 1024,
-    },
-  };
-
-  for (const modelName of targetModels) {
-    const modelUrl = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`;
-    
+  for (const model of targetModels) {
     try {
-      console.log(`Attempting connection with model: ${modelName}`);
-      const response = await fetch(modelUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      });
+      console.log(`DEBUG: Attempting ${model.name} (${model.version}) via REST...`);
+      
+      const body = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+      };
+      
+      if (systemPrompt) {
+        body.system_instruction = { parts: [{ text: systemPrompt }] };
+      }
 
-      if (response.ok) {
-        const data = await response.json();
-        const text = data.candidates[0]?.content?.parts[0]?.text;
-        if (text) {
-          console.log(`Success with model: ${modelName}`);
-          return text;
+      let res = await fetch(
+        `https://generativelanguage.googleapis.com/${model.version}/models/${model.name}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
         }
-      }
-      
-      const errorData = await response.json();
-      console.warn(`Model ${modelName} failed (${response.status}):`, errorData?.error?.message);
-      
-      // If it's not a 404 (like an invalid key error 400), don't keep trying models
-      if (response.status !== 404 && response.status !== 400) {
-        throw new Error(errorData?.error?.message || `API Error (${response.status})`);
-      }
-      
-      if (response.status === 400 && errorData?.error?.message?.includes("API key not valid")) {
-         throw new Error("Invalid API Key. Please check your .env file.");
+      );
+
+      if (!res.ok) {
+        let errData = await res.json().catch(() => ({}));
+        
+        // If system_instruction is the problem, try without it
+        if (errData?.error?.message?.toLowerCase().includes("system_instruction") || res.status === 400) {
+           console.warn(`DEBUG: Model ${model.name} rejects system_instruction, retrying without it...`);
+           const retryPrompt = `${systemPrompt}\n\n${prompt}`;
+           const retryBody = {
+             contents: [{ role: 'user', parts: [{ text: retryPrompt }] }],
+             generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+           };
+           const retryRes = await fetch(
+             `https://generativelanguage.googleapis.com/${model.version}/models/${model.name}:generateContent?key=${apiKey}`,
+             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(retryBody) }
+           );
+           
+           if (retryRes.ok) {
+             const retryData = await retryRes.json();
+             return retryData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+           } else {
+             errData = await retryRes.json().catch(() => ({}));
+           }
+        }
+        
+        throw new Error(errData?.error?.message || `API error ${res.status}`);
       }
 
-    } catch (error) {
-      if (error.message.includes("Invalid API Key")) throw error;
-      console.error(`Error with model ${modelName}:`, error);
-      // Continue to next model in loop
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      if (text) {
+        console.log(`DEBUG: Success with ${model.name}!`);
+        return text;
+      }
+    } catch (e) {
+      console.warn(`DEBUG: ${model.name} failed:`, e.message);
+      lastError = e;
+      
+      if (e.message?.includes('API key not valid') || e.message?.includes('PERMISSION_DENIED')) {
+         throw new Error("Invalid API Key. Please verify your .env file.");
+      }
+      
+      if (e.message?.includes('quota') || e.message?.includes('429')) {
+         console.error(`DEBUG: model ${model.name} quota exceeded.`);
+      }
     }
   }
 
-  throw new Error("Could not connect to any Gemini models. Please check your API key and Internet connection.");
+  throw lastError || new Error("All AI models are busy. Please try again in 1 minute.");
 }
 
 // ============================================================
