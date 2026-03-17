@@ -25,8 +25,7 @@
 https://t7skillup.vercel.app
 
 🎥 **Demo Video**
-*(Insert Demo Link Here)*
-
+(https://youtu.be/ii0ZhFK8xOU?si=r9UxTAMu5Z9MLDtn)
 </p>
 
 ---
