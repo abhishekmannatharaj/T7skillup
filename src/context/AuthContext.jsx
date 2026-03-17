@@ -17,6 +17,19 @@ import { auth, db } from '../config/firebase';
 
 const AuthContext = createContext();
 
+/**
+ * Generate a unique T7 Account ID (format: T7-XXXXXX)
+ * 6 alphanumeric uppercase characters for human-friendly sharing
+ */
+const generateT7Id = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 to avoid confusion
+  let id = 'T7-';
+  for (let i = 0; i < 6; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return id;
+};
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -34,15 +47,20 @@ export const AuthProvider = ({ children }) => {
   const signup = async (email, password, name, role = 'student') => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     
+    // Generate unique T7 Account ID for extension linking
+    const t7Id = generateT7Id();
+
     // Create user profile in Firestore
     await setDoc(doc(db, 'users', userCredential.user.uid), {
       name,
       email,
       role,
+      t7Id,
       branch: '',
       year: null,
       career_interest: '',
       skills: [],
+      ytSkills: [],
       createdAt: serverTimestamp()
     });
 
@@ -88,7 +106,15 @@ export const AuthProvider = ({ children }) => {
         
         if (user) {
           try {
-            const profile = await fetchUserProfile(user.uid);
+            let profile = await fetchUserProfile(user.uid);
+            
+            // Migrate: generate T7 ID for existing users who don't have one
+            if (profile && !profile.t7Id) {
+              const t7Id = generateT7Id();
+              await setDoc(doc(db, 'users', user.uid), { t7Id }, { merge: true });
+              profile = { ...profile, t7Id };
+            }
+            
             setUserProfile(profile);
           } catch (err) {
             console.error('Error fetching user profile:', err);

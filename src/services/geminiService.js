@@ -22,6 +22,7 @@ INPUT DATA:
 1. Student's current skills
 2. Target career role  
 3. Industry skill requirements
+4. Optional resume file uploaded by the student
 
 ANALYSIS REQUIREMENTS:
 - Be brutally honest about skill gaps
@@ -75,6 +76,13 @@ ROADMAP MUST INCLUDE (THIS IS CRITICAL):
    - LinkedIn optimization
    - How to network
    - Open source contribution guide
+
+9. ATS RESUME REVIEW:
+   - Score the uploaded resume for ATS-friendliness from 0-100 if a resume is provided
+   - Highlight missing keywords relevant to the selected role
+   - Identify formatting or structure issues that hurt ATS parsing
+   - Suggest bullet rewrites or section improvements for the resume
+   - If no resume is provided, return null for ats_analysis
 
 OUTPUT FORMAT (Valid JSON only, no markdown):
 {
@@ -168,6 +176,24 @@ OUTPUT FORMAT (Valid JSON only, no markdown):
     "How to write bullet point for skill X",
     "Action verbs to use"
   ],
+  "ats_analysis": {
+    "score": 72,
+    "summary": "Short ATS summary",
+    "strengths": ["Clear section headings", "Relevant keywords included"],
+    "issues": ["Missing project impact metrics", "Skills section is too generic"],
+    "keyword_gaps": ["REST APIs", "Testing", "TypeScript"],
+    "suggested_keywords": ["React", "JavaScript", "Git", "Responsive Design"],
+    "section_scores": {
+      "formatting": 80,
+      "keyword_match": 65,
+      "content_strength": 70,
+      "impact": 60
+    },
+    "rewrite_suggestions": [
+      "Rewrite weak bullet points using action + impact",
+      "Add a dedicated skills section with exact job keywords"
+    ]
+  },
   "linkedin_tips": [
     "Profile optimization tip",
     "What to post"
@@ -185,15 +211,47 @@ Selected Career Role:
 Industry Skill Dataset:
 {{INDUSTRY_SKILLS_JSON}}`;
 
+const fileToGenerativePart = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      const base64 = reader.result?.split(',')[1];
+
+      if (!base64) {
+        reject(new Error('Could not read resume file'));
+        return;
+      }
+
+      resolve({
+        inlineData: {
+          data: base64,
+          mimeType: file.type || 'application/octet-stream'
+        }
+      });
+    };
+
+    reader.onerror = () => reject(new Error('Failed to read resume file'));
+    reader.readAsDataURL(file);
+  });
+
+const normalizeSectionScores = (scores = {}) => ({
+  formatting: scores.formatting || 0,
+  keyword_match: scores.keyword_match || 0,
+  content_strength: scores.content_strength || 0,
+  impact: scores.impact || 0
+});
+
 /**
  * Analyze skill gap using Gemini AI
  * 
  * @param {string[]} studentSkills - Array of student's current skills
  * @param {object} selectedRole - Selected career role object
  * @param {object[]} allRoles - All industry roles for context
+ * @param {File|null} resumeFile - Optional uploaded resume file
  * @returns {Promise<object>} - Analysis result object
  */
-export const analyzeT7skillup = async (studentSkills, selectedRole, allRoles) => {
+export const analyzeT7skillup = async (studentSkills, selectedRole, allRoles, resumeFile = null) => {
   try {
     // Build the prompt with actual data
     const prompt = SKILL_GAP_PROMPT
@@ -206,11 +264,45 @@ export const analyzeT7skillup = async (studentSkills, selectedRole, allRoles) =>
         priority_skills: selectedRole.priority_skills
       }, null, 2));
 
-    // Get Gemini model
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // Build request parts
+    const requestParts = [{ text: prompt }];
 
-    // Generate response
-    const result = await model.generateContent(prompt);
+    if (resumeFile) {
+      requestParts.push({
+        text: `The uploaded file is the student's resume. Review it for ATS performance against the selected role "${selectedRole.role_name}".`
+      });
+      requestParts.push(await fileToGenerativePart(resumeFile));
+    }
+
+    // Try multiple models in order of preference
+    const modelNames = [
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
+      'gemini-pro'
+    ];
+
+    let result = null;
+    let lastModelError = null;
+
+    for (const modelName of modelNames) {
+      try {
+        console.log(`Trying model: ${modelName}`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        result = await model.generateContent(requestParts);
+        console.log(`Success with model: ${modelName}`);
+        break;
+      } catch (modelErr) {
+        console.warn(`Model ${modelName} failed:`, modelErr.message);
+        lastModelError = modelErr;
+        continue;
+      }
+    }
+
+    if (!result) {
+      throw lastModelError || new Error('All Gemini models failed');
+    }
+
     const response = await result.response;
     const text = response.text();
 
@@ -231,16 +323,126 @@ export const analyzeT7skillup = async (studentSkills, selectedRole, allRoles) =>
     return {
       career_role: analysisResult.career_role || selectedRole.role_name,
       readiness_score: Math.min(100, Math.max(0, analysisResult.readiness_score || 0)),
+      score_breakdown: analysisResult.score_breakdown || {},
+      honest_assessment: analysisResult.honest_assessment || '',
       matched_skills: analysisResult.matched_skills || [],
       missing_skills: analysisResult.missing_skills || [],
       recommended_skills: analysisResult.recommended_skills || [],
-      learning_roadmap: analysisResult.learning_roadmap || []
+      skill_priority_order: analysisResult.skill_priority_order || analysisResult.recommended_skills || [],
+      learning_roadmap: analysisResult.learning_roadmap || [],
+      quick_wins: analysisResult.quick_wins || [],
+      resume_tips: analysisResult.resume_tips || [],
+      linkedin_tips: analysisResult.linkedin_tips || [],
+      motivation: analysisResult.motivation || '',
+      final_outcome: analysisResult.final_outcome || '',
+      ats_analysis: analysisResult.ats_analysis
+        ? {
+            score: Math.min(100, Math.max(0, analysisResult.ats_analysis.score || 0)),
+            summary: analysisResult.ats_analysis.summary || '',
+            strengths: analysisResult.ats_analysis.strengths || [],
+            issues: analysisResult.ats_analysis.issues || [],
+            keyword_gaps: analysisResult.ats_analysis.keyword_gaps || [],
+            suggested_keywords: analysisResult.ats_analysis.suggested_keywords || [],
+            section_scores: normalizeSectionScores(analysisResult.ats_analysis.section_scores),
+            rewrite_suggestions: analysisResult.ats_analysis.rewrite_suggestions || []
+          }
+        : null,
+      resume_meta: resumeFile
+        ? {
+            file_name: resumeFile.name,
+            file_type: resumeFile.type || 'application/octet-stream'
+          }
+        : null
     };
   } catch (error) {
     console.error('Gemini API error:', error);
     
     // Fallback: Generate basic analysis locally if API fails
-    return generateFallbackAnalysis(studentSkills, selectedRole);
+    return generateFallbackAnalysis(studentSkills, selectedRole, resumeFile);
+  }
+};
+
+/**
+ * Perform a standalone ATS analysis against a selected career role
+ */
+export const analyzeResumeOnly = async (resumeFile, selectedRole, apiKey) => {
+  if (!apiKey) throw new Error('API key is required');
+  
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const resumePart = await fileToGenerativePart(resumeFile);
+  
+  const prompt = `Analyze this resume against the "${selectedRole.role_name}" role.
+  Role Skills: ${selectedRole.required_skills.map(s => s.name).join(', ')}
+
+  Return ONLY a valid JSON object EXACTLY like this (no markdown, no other text):
+  {
+    "score": 65,
+    "summary": "Short evaluation",
+    "strengths": ["...", "..."],
+    "issues": ["...", "..."],
+    "keyword_gaps": ["...", "..."],
+    "suggested_keywords": ["...", "..."],
+    "section_scores": {
+      "formatting": 70,
+      "keyword_match": 50,
+      "content_strength": 60,
+      "impact": 55
+    },
+    "rewrite_suggestions": ["...", "..."]
+  }`;
+
+  try {
+    const modelNames = [
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-2.5-flash',
+      'gemini-flash-latest'
+    ];
+
+    let result = null;
+    let lastError = null;
+
+    for (const modelName of modelNames) {
+      try {
+        console.log(`ATS Standalone trying model: ${modelName}`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        result = await model.generateContent([ prompt, resumePart ]);
+        console.log(`ATS Standalone success with: ${modelName}`);
+        break;
+      } catch (err) {
+        console.warn(`ATS Standalone model ${modelName} failed:`, err.message);
+        lastError = err;
+      }
+    }
+
+    if (!result) throw lastError || new Error('All Gemini models failed for ATS');
+
+    const response = await result.response;
+    const text = response.text();
+    
+    if (!text) throw new Error('Empty response from AI');
+    
+    // Parse JSON
+    let jsonText = text;
+    if (text.includes('```json')) {
+      jsonText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    } else if (text.includes('```')) {
+      jsonText = text.replace(/```\n?/g, '');
+    }
+
+    const parsedResult = JSON.parse(jsonText.trim());
+    
+    return {
+      ats_analysis: parsedResult,
+      resume_meta: {
+        file_name: resumeFile.name,
+        file_type: resumeFile.type,
+        size_kb: Math.round(resumeFile.size / 1024)
+      }
+    };
+  } catch (err) {
+    console.error('ATS ONLY Error:', err);
+    throw err;
   }
 };
 
@@ -248,7 +450,7 @@ export const analyzeT7skillup = async (studentSkills, selectedRole, allRoles) =>
  * Fallback analysis when Gemini API is unavailable
  * Provides a basic skill gap analysis based on simple comparison
  */
-const generateFallbackAnalysis = (studentSkills, selectedRole) => {
+const generateFallbackAnalysis = (studentSkills, selectedRole, resumeFile = null) => {
   const requiredSkillNames = selectedRole.required_skills.map(s => s.name);
   const studentSkillsLower = studentSkills.map(s => s.toLowerCase());
   
@@ -307,10 +509,61 @@ const generateFallbackAnalysis = (studentSkills, selectedRole) => {
   return {
     career_role: selectedRole.role_name,
     readiness_score: readinessScore,
+    score_breakdown: {
+      technical_skills: readinessScore,
+      projects: Math.max(20, readinessScore - 10),
+      interview_readiness: Math.max(25, readinessScore - 5)
+    },
+    honest_assessment: matched.length > 0
+      ? `You already have some alignment with ${selectedRole.role_name}, but there are still important gaps to close before placements.`
+      : `You are still at the starting point for ${selectedRole.role_name}, so focus on the highest-priority fundamentals first.`,
     matched_skills: matched,
     missing_skills: missing,
     recommended_skills: highPriorityMissing.slice(0, 5),
-    learning_roadmap: roadmap
+    skill_priority_order: highPriorityMissing.slice(0, 5).map((skill) => ({
+      skill,
+      reason: 'High-priority requirement for this role',
+      time_to_learn: '2-4 weeks',
+      difficulty: 'Medium'
+    })),
+    learning_roadmap: roadmap,
+    quick_wins: highPriorityMissing.slice(0, 3).map((skill) => ({
+      task: `Start practicing ${skill}`,
+      time: '1-2 hours',
+      impact: `Improves alignment with ${selectedRole.role_name}`
+    })),
+    resume_tips: [
+      'Use measurable impact in project bullet points',
+      'Add keywords from the job role naturally in skills and projects'
+    ],
+    linkedin_tips: [
+      `Mention your interest in ${selectedRole.role_name} clearly in the headline`,
+      'Post weekly progress about projects and learning milestones'
+    ],
+    motivation: 'Consistent weekly effort will compound quickly if you keep building and practicing.',
+    final_outcome: `You will have a much stronger profile for ${selectedRole.role_name} interviews after following the roadmap.`,
+    ats_analysis: resumeFile ? {
+      score: 55,
+      summary: 'Resume uploaded, but ATS-specific AI analysis is unavailable right now. Use the suggestions below as a starter checklist.',
+      strengths: ['Resume is available for review'],
+      issues: ['Detailed ATS parsing could not be completed in fallback mode'],
+      keyword_gaps: selectedRole.priority_skills.slice(0, 5),
+      suggested_keywords: selectedRole.priority_skills.slice(0, 6),
+      section_scores: {
+        formatting: 60,
+        keyword_match: 50,
+        content_strength: 55,
+        impact: 50
+      },
+      rewrite_suggestions: [
+        'Rewrite project bullets with action verbs and outcomes',
+        'Mirror important role keywords in the skills and projects sections'
+      ]
+    } : null,
+    resume_meta: resumeFile ? {
+      file_name: resumeFile.name,
+      file_type: resumeFile.type || 'application/octet-stream'
+    } : null
   };
 };
 

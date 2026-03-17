@@ -23,10 +23,10 @@ const Landing = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-zinc-100">
         <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
+              <Rocket className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-zinc-900 text-xl">T7skillup</span>
+            <span className="font-bold text-blue-900 text-xl">T7skillup</span>
           </div>
           
           <div className="flex items-center gap-3">
@@ -59,15 +59,14 @@ const Landing = () => {
                 AI-Powered Career Analysis
               </div>
               
-              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-zinc-900 leading-[1.1] mb-8">
-                Know your skill gaps
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-blue-900 leading-[1.1] mb-8">
+                From uncertainty to clarity
                 <br />
-                <span className="text-zinc-400">before placements</span>
+                <span className="text-blue-400">craft your personalized tech career path</span>
               </h1>
               
-              <p className="text-xl text-zinc-600 max-w-xl mx-auto lg:mx-0 mb-10 leading-relaxed">
-                Compare your skills with industry requirements. Get a personalized 
-                roadmap to become <span className="font-semibold text-zinc-900">placement-ready</span> with AI-powered insights.
+              <p className="text-xl text-blue-700 max-w-xl mx-auto lg:mx-0 mb-10 leading-relaxed">
+                Assess your abilities, close gaps with AI-backed coaching, and enter campus placements with confidence.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -75,15 +74,8 @@ const Landing = () => {
                   to="/signup" 
                   className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-zinc-900 text-white font-bold rounded-xl hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-900/20 hover:-translate-y-0.5"
                 >
-                  Start free analysis
+                  Begin onboarding
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <Link 
-                  to="/login" 
-                  className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-zinc-100 text-zinc-700 font-semibold rounded-xl hover:bg-zinc-200 transition-all"
-                >
-                  <Rocket className="w-5 h-5" />
-                  View demo
                 </Link>
               </div>
 
@@ -108,12 +100,17 @@ const Landing = () => {
 
             {/* Hero Image */}
             <div className="relative">
-              <div className="relative z-10">
-                <img 
-                  src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&h=500&fit=crop" 
-                  alt="Students collaborating" 
-                  className="rounded-2xl shadow-2xl shadow-zinc-900/10"
-                />
+              <div className="relative z-10 bg-gradient-to-r from-zinc-100 to-white rounded-2xl p-8 shadow-2xl shadow-zinc-900/10">
+                <div className="w-full h-96 rounded-2xl bg-gradient-to-br from-blue-600 via-cyan-500 to-teal-400 overflow-hidden relative">
+                  <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_20%_20%,_white_0%,_transparent_50%)]"></div>
+                  <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_80%_80%,_white_0%,_transparent_45%)]"></div>
+                  <div className="absolute inset-0 flex items-center justify-center p-8">
+                    <div className="bg-white/15 border border-white/30 rounded-3xl p-6 shadow-xl text-center">
+                      <p className="text-white text-xl font-bold mb-2">AI-guided learning plans</p>
+                      <p className="text-white/90 text-sm">Your next 90 days of growth, mapped to placement-ready skills.</p>
+                    </div>
+                  </div>
+                </div>
                 
                 {/* Floating cards */}
                 <div className="absolute -left-6 top-1/4 bg-white rounded-xl shadow-xl p-4 border border-zinc-100 animate-float">
@@ -175,10 +172,10 @@ const Landing = () => {
       <section className="py-24 px-8 bg-zinc-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <span className="inline-block px-5 py-2 bg-zinc-200 text-zinc-700 rounded-full text-base font-semibold mb-5">Simple Process</span>
-            <h2 className="text-4xl sm:text-5xl font-black text-zinc-900 mb-5">How it works</h2>
-            <p className="text-zinc-600 max-w-xl mx-auto text-xl">
-              Three simple steps to understand your placement readiness
+            <span className="inline-block px-5 py-2 bg-blue-100 text-blue-800 rounded-full text-base font-semibold mb-5">Career Engine</span>
+            <h2 className="text-4xl sm:text-5xl font-black text-blue-900 mb-5">Transform how you learn</h2>
+            <p className="text-blue-700 max-w-xl mx-auto text-xl">
+              A guided journey that syncs your profile with market demand, skill gaps, and practice plans.
             </p>
           </div>
 

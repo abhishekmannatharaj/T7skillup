@@ -35,10 +35,20 @@ export const saveAnalysis = async (userId, analysisData) => {
       userId,
       career_role: analysisData.career_role,
       readiness_score: analysisData.readiness_score,
+      score_breakdown: analysisData.score_breakdown || {},
+      honest_assessment: analysisData.honest_assessment || '',
       matched_skills: analysisData.matched_skills,
       missing_skills: analysisData.missing_skills,
       recommended_skills: analysisData.recommended_skills,
+      skill_priority_order: analysisData.skill_priority_order || [],
       learning_roadmap: analysisData.learning_roadmap,
+      quick_wins: analysisData.quick_wins || [],
+      resume_tips: analysisData.resume_tips || [],
+      linkedin_tips: analysisData.linkedin_tips || [],
+      motivation: analysisData.motivation || '',
+      final_outcome: analysisData.final_outcome || '',
+      ats_analysis: analysisData.ats_analysis || null,
+      resume_meta: analysisData.resume_meta || null,
       createdAt: serverTimestamp()
     });
     return docRef.id;
@@ -210,11 +220,99 @@ export const getAllStudents = async () => {
   }
 };
 
+/**
+ * Get all video learning entries for a user (synced from extension)
+ * 
+ * @param {string} userId - Firebase Auth UID (used as accountId in extension)
+ * @returns {Promise<object[]>} - Array of video learning entries
+ */
+export const getVideoLearning = async (userId) => {
+  try {
+    const videoRef = collection(db, 'users', userId, 'videoLearning');
+    const q = query(videoRef, orderBy('date', 'desc'));
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        videoId: data.videoId || '',
+        title: data.title || '',
+        date: data.date || null,
+        rating: data.rating || 0,
+        relevance: data.relevance || 0,
+        summary: data.summary || '',
+        topSkills: (data.topSkills || [])
+          .map(s => typeof s === 'string' ? s : s.stringValue || s)
+          .filter(s => s && s.length >= 3 && !['this','that','with','from','video','the','and','for','are','you','was','has','have','not','but','can','our','out','how','who','its','all','one','get','use','also','just','well','using','best','good','great','like','make','each','only','over','been','will','more','some','very','your','many','most','such','here','both','does','learn','learning','course','tutorial','beginners','beginner','full','complete','introduction','intro','basic','basics','covers','covered','about','programming','coding','development','software','computer','science','technology','tech','web','app','application','build','building','create','creating','work','working','first','second','part','step','into','new','way','data','code','guide','master','advanced','intermediate','everything','need','know','start','started','getting','understanding','concepts','overview','easy','hard','simple','free','paid','online','project','projects','skill','skills','topics','topic','different','important','essential'].includes(s.toLowerCase().trim()))
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching video learning:', error);
+    return [];
+  }
+};
+
+/**
+ * Extract unique skills learned from all YouTube videos
+ * 
+ * @param {string} userId - Firebase Auth UID
+ * @returns {Promise<string[]>} - Deduplicated array of skill names
+ */
+export const getVideoLearningSkills = async (userId) => {
+  // Common words that are NOT skills (filter out old bad data)
+  const JUNK_WORDS = new Set([
+    'this', 'that', 'with', 'from', 'video', 'the', 'and', 'for', 'are',
+    'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our',
+    'out', 'has', 'have', 'been', 'will', 'more', 'when', 'who', 'how',
+    'what', 'where', 'why', 'which', 'their', 'them', 'then', 'than',
+    'into', 'also', 'just', 'about', 'would', 'make', 'like', 'time',
+    'very', 'your', 'some', 'could', 'each', 'other', 'many', 'most',
+    'such', 'only', 'over', 'here', 'both', 'after', 'these', 'those',
+    'being', 'does', 'doing', 'during', 'before', 'between', 'through',
+    'learn', 'learning', 'course', 'tutorial', 'beginners', 'beginner',
+    'full', 'complete', 'introduction', 'intro', 'basic', 'basics',
+    'covers', 'covered', 'best', 'well', 'good', 'great', 'using',
+    'programming', 'coding', 'development', 'software', 'computer',
+    'science', 'technology', 'tech', 'web', 'app', 'application',
+    'build', 'building', 'create', 'creating', 'work', 'working',
+    'first', 'second', 'part', 'step', 'into', 'new', 'way', 'data',
+    'code', 'guide', 'master', 'advanced', 'intermediate', 'everything',
+    'need', 'know', 'start', 'started', 'getting', 'understanding',
+    'concepts', 'overview', 'easy', 'hard', 'simple', 'free', 'paid',
+    'online', 'project', 'projects', 'skill', 'skills', 'topics',
+    'topic', 'different', 'important', 'essential'
+  ]);
+
+  try {
+    const videos = await getVideoLearning(userId);
+    const skillSet = new Set();
+    videos.forEach(video => {
+      (video.topSkills || []).forEach(skill => {
+        if (skill && typeof skill === 'string' && skill.length >= 3) {
+          const lower = skill.toLowerCase().trim();
+          if (!JUNK_WORDS.has(lower)) {
+            // Capitalize first letter for consistency
+            skillSet.add(skill.charAt(0).toUpperCase() + skill.slice(1));
+          }
+        }
+      });
+    });
+    return Array.from(skillSet);
+  } catch (error) {
+    console.error('Error extracting video skills:', error);
+    return [];
+  }
+};
+
 export default {
   saveAnalysis,
   getLatestAnalysis,
   getUserAnalyses,
   getAllAnalyses,
   getCampusAnalytics,
-  getAllStudents
+  getAllStudents,
+  getVideoLearning,
+  getVideoLearningSkills
 };
+

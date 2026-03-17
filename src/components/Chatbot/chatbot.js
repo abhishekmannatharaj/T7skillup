@@ -49,12 +49,16 @@ Respond in clean, readable text. Use bullet points and short paragraphs. Never u
 // GEMINI API CALL
 // ============================================================
 export async function callGemini(apiKey, messages, systemPrompt) {
-  // Ordered from newest/most preferred to older/more common
+  // All verified available models (from ListModels API, v1beta)
   const targetModels = [
-    "gemini-2.5-flash",
     "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-2.5-flash",
     "gemini-flash-latest",
-    "gemini-pro-latest"
+    "gemini-flash-lite-latest",
+    "gemini-pro-latest",
+    "gemini-2.0-flash-001",
+    "gemini-2.0-flash-lite-001"
   ];
 
   // Convert messages to Gemini format
@@ -87,8 +91,11 @@ export async function callGemini(apiKey, messages, systemPrompt) {
     },
   };
 
+  let lastError = null;
+
   for (const modelName of targetModels) {
-    const modelUrl = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`;
+    // Use v1beta for all models (supports all free models)
+    const modelUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
     
     try {
       console.log(`Attempting connection with model: ${modelName}`);
@@ -98,35 +105,46 @@ export async function callGemini(apiKey, messages, systemPrompt) {
         body: JSON.stringify(requestBody),
       });
 
+      // Read body ONCE
+      const data = await response.json();
+
       if (response.ok) {
-        const data = await response.json();
-        const text = data.candidates[0]?.content?.parts[0]?.text;
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
           console.log(`Success with model: ${modelName}`);
           return text;
         }
+        // No text in response, try next model
+        console.warn(`Model ${modelName}: empty response, trying next`);
+        continue;
       }
       
-      const errorData = await response.json();
-      console.warn(`Model ${modelName} failed (${response.status}):`, errorData?.error?.message);
+      const errorMsg = data?.error?.message || `API Error (${response.status})`;
+      console.warn(`Model ${modelName} failed (${response.status}):`, errorMsg);
+      lastError = errorMsg;
       
-      // If it's not a 404 (like an invalid key error 400), don't keep trying models
-      if (response.status !== 404 && response.status !== 400) {
-        throw new Error(errorData?.error?.message || `API Error (${response.status})`);
+      // If it's an invalid API key error, don't keep trying
+      if (response.status === 400 && errorMsg.includes("API key not valid")) {
+        throw new Error("Invalid API Key. Please check your Gemini API key in .env file.");
       }
       
-      if (response.status === 400 && errorData?.error?.message?.includes("API key not valid")) {
-         throw new Error("Invalid API Key. Please check your .env file.");
+      // For 404 (model not found) or 429 (rate limit), try next model
+      if (response.status === 404 || response.status === 429) {
+        continue;
       }
+      
+      // For other errors (403 forbidden, 500 server error), also try next
+      continue;
 
     } catch (error) {
       if (error.message.includes("Invalid API Key")) throw error;
-      console.error(`Error with model ${modelName}:`, error);
-      // Continue to next model in loop
+      console.error(`Error with model ${modelName}:`, error.message);
+      lastError = error.message;
+      // Continue to next model
     }
   }
 
-  throw new Error("Could not connect to any Gemini models. Please check your API key and Internet connection.");
+  throw new Error(lastError || "Could not connect to any Gemini models. Please check your API key and Internet connection.");
 }
 
 // ============================================================

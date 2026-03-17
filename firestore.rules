@@ -6,6 +6,16 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
       allow read: if request.auth != null && 
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      
+      // Video learning data (synced from extension)
+      // Extension uses REST API without auth, so allow public create
+      // Authenticated users can read their own data
+      match /videoLearning/{docId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if true;
+        allow read: if request.auth != null && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      }
     }
     
     // Skill analysis - users can read/write their own, admins can read all
@@ -25,3 +35,4 @@ service cloud.firestore {
     }
   }
 }
+
